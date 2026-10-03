@@ -1,10 +1,9 @@
-HTML
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TCG マッチングツール</title>
+  <title>TCG マッチング案内</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
@@ -23,29 +22,30 @@ HTML
 
     <!-- 接続ステータス -->
     <div id="api-status-bar" class="mb-4 p-2.5 rounded-lg text-xs font-semibold flex items-center justify-between bg-amber-50 text-amber-800 border border-amber-200">
-      <span>⚠️ GAS API URLが未設定です。「運営画面 → API接続設定」でURLを登録してください。</span>
+      <span>⚠️️ GAS API URLが未設定です。「運営画面 → API接続設定」でURLを登録してください。</span>
     </div>
 
     <!-- 1. 参加者画面 -->
     <main id="view-participant" class="space-y-4">
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-        <h2 class="font-bold text-slate-700 mb-3 text-base">あなたの名前を選択</h2>
+      <!-- ログイン（名前固定）カード -->
+      <div id="user-login-card" class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="font-bold text-slate-700 mb-2 text-base">プレイヤーの選択（本人確認）</h2>
+        <p class="text-xs text-slate-500 mb-3">自分のハンドルネームを選択して確定してください。一度決定するとこの端末に固定されます。</p>
         <div class="flex gap-2 mb-3">
-          <select id="user-select" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50" onchange="onUserSelect()">
+          <select id="user-select" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50">
             <option value="">-- 名前を選択してください --</option>
           </select>
-          <button onclick="fetchData()" class="px-4 py-2.5 bg-slate-200 text-slate-700 font-bold text-xs rounded-lg whitespace-nowrap">更新</button>
-        </div>
-        <div class="border-t border-slate-100 pt-3">
-          <p class="text-xs text-slate-500 mb-2">リストに名前がない場合はこちら：</p>
-          <div class="flex gap-2">
-            <input type="text" id="new-user-name" placeholder="ハンドルネーム" class="flex-1 p-2 border border-slate-300 rounded-lg text-sm">
-            <button onclick="registerSelf()" class="px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-lg">エントリー</button>
-          </div>
+          <button onclick="confirmUser()" class="px-4 py-2.5 bg-blue-600 text-white font-bold text-xs rounded-lg whitespace-nowrap">確定する</button>
         </div>
       </div>
 
+      <!-- 本人専用ステータスカード -->
       <div id="participant-status-card" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 text-center hidden">
+        <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
+          <span class="text-xs text-slate-400">ログイン中:</span>
+          <span id="display-user-name" class="text-sm font-bold text-slate-800"></span>
+          <button onclick="logoutUser()" class="text-xs text-slate-400 underline">変更</button>
+        </div>
         <div id="status-content"></div>
       </div>
     </main>
@@ -123,7 +123,7 @@ HTML
 
   <script>
     let appState = { players: [], matches: [] };
-    let currentUser = "";
+    let myPlayerName = localStorage.getItem("tcg_my_player_name") || "";
     let gasApiUrl = localStorage.getItem("tcg_gas_api_url") || "";
 
     window.onload = function() {
@@ -180,14 +180,14 @@ HTML
     function fetchData() { apiRequest("getData"); }
 
     function renderApp() {
-      // ユーザー選択肢
+      // ドロップダウン更新
       const select = document.getElementById("user-select");
       const currentVal = select.value;
       select.innerHTML = '<option value="">-- 名前を選択してください --</option>';
       appState.players.forEach(p => {
         const opt = document.createElement("option");
         opt.value = p.name;
-        opt.textContent = `${p.name} (対戦数: ${p.count})`;
+        opt.textContent = p.name;
         if (p.name === currentVal) opt.selected = true;
         select.appendChild(opt);
       });
@@ -198,19 +198,42 @@ HTML
       renderPlayersTable();
     }
 
-    function onUserSelect() {
-      currentUser = document.getElementById("user-select").value;
+    function confirmUser() {
+      const val = document.getElementById("user-select").value;
+      if (!val) return alert("名前を選択してください");
+      myPlayerName = val;
+      localStorage.setItem("tcg_my_player_name", myPlayerName);
       renderParticipantCard();
     }
 
-    function renderParticipantCard() {
-      const card = document.getElementById("participant-status-card");
-      const content = document.getElementById("status-content");
-      if (!currentUser) { card.classList.add("hidden"); return; }
+    function logoutUser() {
+      if (confirm("名前の選択を解除しますか？")) {
+        myPlayerName = "";
+        localStorage.removeItem("tcg_my_player_name");
+        renderParticipantCard();
+      }
+    }
 
-      card.classList.remove("hidden");
-      const player = appState.players.find(p => p.name === currentUser);
-      if (!player) return;
+    function renderParticipantCard() {
+      const loginCard = document.getElementById("user-login-card");
+      const statusCard = document.getElementById("participant-status-card");
+      const content = document.getElementById("status-content");
+
+      if (!myPlayerName) {
+        loginCard.classList.remove("hidden");
+        statusCard.classList.add("hidden");
+        return;
+      }
+
+      loginCard.classList.add("hidden");
+      statusCard.classList.remove("hidden");
+      document.getElementById("display-user-name").textContent = myPlayerName;
+
+      const player = appState.players.find(p => p.name === myPlayerName);
+      if (!player) {
+        content.innerHTML = `<p class="text-xs text-red-500">選択された名前（${myPlayerName}）がリストに見つかりません。</p>`;
+        return;
+      }
 
       if (player.status === "対戦中") {
         content.innerHTML = `
@@ -234,13 +257,6 @@ HTML
     }
 
     function setStatus(name, status) { apiRequest("setStatus", { name, status }); }
-    function registerSelf() {
-      const name = document.getElementById("new-user-name").value.trim();
-      if (!name) return;
-      currentUser = name;
-      apiRequest("register", { name });
-      document.getElementById("new-user-name").value = "";
-    }
 
     function triggerMatch(forceThree) { apiRequest("match", { forceThree }); }
     function resetData() { if (confirm("本当に全データを消去しますか？")) apiRequest("reset"); }
@@ -303,7 +319,7 @@ HTML
       });
     }
 
-    // 10秒毎に自動同期
+    // 10秒毎に自動更新
     setInterval(fetchData, 10000);
   </script>
 </body>
