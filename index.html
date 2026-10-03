@@ -1,998 +1,310 @@
+HTML
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TCG 4人戦 セルフエントリー対応 自動マッチング</title>
+  <title>TCG マッチングツール</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap');
-    body {
-      font-family: 'Noto Sans JP', 'Inter', sans-serif;
-    }
-    .card-shadow {
-      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
-    }
-    .pulse-animation {
-      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: .6; }
-    }
-  </style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
-
-  <!-- Top Navigation Header -->
-  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-      <div class="flex items-center space-x-2.5">
-        <div class="bg-indigo-600 text-white p-2 rounded-xl font-bold text-xl flex items-center justify-center w-10 h-10 shadow-lg shadow-indigo-600/30">
-          <i class="fa-solid fa-cards-blank"></i>
-        </div>
-        <div>
-          <h1 class="font-black text-base md:text-lg leading-tight">TCG マッチング</h1>
-          <p class="text-[10px] md:text-xs text-slate-400">リアルタイム卓案内・自動マッチング</p>
-        </div>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
+  <div id="app" class="max-w-4xl mx-auto p-4">
+    <!-- ヘッダー -->
+    <header class="bg-slate-900 text-white p-4 rounded-xl shadow-lg mb-6 flex justify-between items-center">
+      <div>
+        <h1 class="text-xl font-bold">TCG マッチング案内</h1>
+        <p class="text-xs text-slate-400">リアルタイム卓案内・自動対戦管理</p>
       </div>
-
-      <!-- Mode Switcher -->
-      <div class="flex bg-slate-800 p-1 rounded-xl border border-slate-700/80">
-        <button id="nav-participant-btn" onclick="switchView('participant')" class="px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold transition-all duration-200 flex items-center space-x-1 bg-indigo-600 text-white shadow">
-          <i class="fa-solid fa-user-plus"></i>
-          <span>参加者画面</span>
-        </button>
-        <button id="nav-admin-btn" onclick="switchView('admin')" class="px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold transition-all duration-200 flex items-center space-x-1 text-slate-400 hover:text-white">
-          <i class="fa-solid fa-user-gear"></i>
-          <span>運営ダッシュボード</span>
-        </button>
+      <div class="flex gap-2">
+        <button id="btn-participant-view" onclick="switchView('participant')" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 text-white">参加者画面</button>
+        <button id="btn-admin-view" onclick="switchView('admin')" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-700 text-slate-300">運営画面</button>
       </div>
+    </header>
+
+    <!-- 接続ステータス -->
+    <div id="api-status-bar" class="mb-4 p-2.5 rounded-lg text-xs font-semibold flex items-center justify-between bg-amber-50 text-amber-800 border border-amber-200">
+      <span>⚠️ GAS API URLが未設定です。「運営画面 → API接続設定」でURLを登録してください。</span>
     </div>
-  </header>
 
-  <!-- Notification Banner Container -->
-  <div id="toast-container" class="fixed top-16 right-4 z-50 max-w-sm flex flex-col space-y-2 pointer-events-none"></div>
-
-  <!-- Main Container -->
-  <main class="max-w-6xl mx-auto px-4 py-6 flex-grow w-full">
-
-    <!-- ========================================== -->
-    <!-- 1. PARTICIPANT VIEW                        -->
-    <!-- ========================================== -->
-    <section id="view-participant" class="space-y-6 max-w-md mx-auto">
-      
-      <!-- Option A: Self-Registration Form -->
-      <div id="entry-form-card" class="bg-white rounded-2xl p-5 card-shadow border border-slate-200/80 space-y-4">
-        <div class="flex items-center space-x-2 text-indigo-600">
-          <i class="fa-solid fa-id-card text-xl"></i>
-          <h2 class="font-bold text-base text-slate-800">新規エントリー（参加登録）</h2>
+    <!-- 1. 参加者画面 -->
+    <main id="view-participant" class="space-y-4">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="font-bold text-slate-700 mb-3 text-base">あなたの名前を選択</h2>
+        <div class="flex gap-2 mb-3">
+          <select id="user-select" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50" onchange="onUserSelect()">
+            <option value="">-- 名前を選択してください --</option>
+          </select>
+          <button onclick="fetchData()" class="px-4 py-2.5 bg-slate-200 text-slate-700 font-bold text-xs rounded-lg whitespace-nowrap">更新</button>
         </div>
-        <p class="text-xs text-slate-500 leading-relaxed">
-          ハンドルネームを入力して「エントリー」を押すと、すぐにマッチング待機状態になります。
-        </p>
-
-        <form onsubmit="handleSelfEntry(event)" class="space-y-3">
-          <div>
-            <label class="block text-xs font-bold text-slate-600 mb-1">ハンドルネーム</label>
-            <input type="text" id="self-entry-name" required placeholder="例: カードマスター" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-base font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
-          </div>
-          <button type="submit" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl font-bold text-base shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center space-x-2">
-            <i class="fa-solid fa-paper-plane"></i>
-            <span>エントリーして参加する</span>
-          </button>
-        </form>
-
-        <div class="pt-3 border-t border-slate-100 text-center">
-          <button onclick="toggleSelectExistingMode()" class="text-xs text-slate-500 hover:text-indigo-600 font-medium underline">
-            既に登録済みの方（名前を選択）はこちら
-          </button>
-        </div>
-      </div>
-
-      <!-- Option B: Select Existing Registered Player -->
-      <div id="select-player-card" class="bg-white rounded-2xl p-5 card-shadow border border-slate-200/80 hidden space-y-3">
-        <div class="flex justify-between items-center">
-          <label class="block text-xs font-bold text-slate-600">
-            <i class="fa-solid fa-users text-indigo-500 mr-1"></i> 登録済みの名前から選択
-          </label>
-          <button onclick="toggleSelectExistingMode()" class="text-xs text-indigo-600 font-bold hover:underline">
-            新規入力に戻る
-          </button>
-        </div>
-        <select id="participant-select" onchange="onParticipantSelect()" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-base font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none">
-          <option value="">-- ハンドルネームを選択 --</option>
-        </select>
-      </div>
-
-      <!-- Player Status Screen -->
-      <div id="participant-status-card" class="bg-white rounded-2xl p-6 card-shadow border border-slate-200/80 hidden text-center space-y-5">
-        
-        <!-- Player Info Badge -->
-        <div class="inline-flex items-center space-x-2 bg-slate-100 px-4 py-1.5 rounded-full text-xs text-slate-700 font-medium">
-          <span id="player-card-name" class="font-extrabold text-slate-900 text-sm">--</span>
-          <span class="text-slate-300">|</span>
-          <span>通算対戦数: <strong id="player-card-count" class="text-indigo-600 font-black">0</strong> 回</span>
-        </div>
-
-        <!-- Dynamic Status Section -->
-        <div id="status-display-area" class="py-2">
-          <!-- Injected via JS -->
-        </div>
-
-        <!-- Primary Action Button -->
-        <div id="participant-action-area">
-          <button id="btn-finish-game" onclick="participantFinishMatch()" class="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center space-x-2">
-            <i class="fa-solid fa-circle-check text-xl"></i>
-            <span>対戦終了（次の対戦を待つ）</span>
-          </button>
-        </div>
-
-        <!-- Status Toggle (Pause / Resume) -->
-        <div class="pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
-          <span>休憩・一時離脱の場合:</span>
-          <button id="btn-toggle-pause" onclick="participantTogglePause()" class="text-slate-600 hover:text-indigo-600 font-bold underline px-2 py-1">
-            一時離脱 / 復帰
-          </button>
-        </div>
-      </div>
-
-      <!-- Active Tables List (Public Info) -->
-      <div class="bg-white rounded-2xl p-5 card-shadow border border-slate-200/80 space-y-3">
-        <h2 class="text-xs font-extrabold text-slate-600 uppercase tracking-wider flex items-center justify-between">
-          <span><i class="fa-solid fa-gamepad text-indigo-500 mr-1.5"></i> 現在進行中の対戦卓</span>
-          <span id="active-table-count" class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-black">0卓</span>
-        </h2>
-        <div id="participant-tables-list" class="space-y-2.5">
-          <!-- Active tables inserted here -->
-        </div>
-      </div>
-    </section>
-
-    <!-- ========================================== -->
-    <!-- 2. ORGANIZER / ADMIN VIEW                  -->
-    <!-- ========================================== -->
-    <section id="view-admin" class="hidden space-y-6">
-      
-      <!-- Top Action Bar & Stat Cards -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <div class="bg-white p-4 rounded-2xl card-shadow border border-slate-200/80">
-          <div class="text-xs text-slate-500 font-bold">登録参加者数</div>
-          <div id="stat-total-players" class="text-2xl font-black text-slate-800 mt-1">0 <span class="text-xs font-normal text-slate-500">名</span></div>
-        </div>
-        <div class="bg-white p-4 rounded-2xl card-shadow border border-slate-200/80">
-          <div class="text-xs text-amber-600 font-bold">対戦待ち（空き）</div>
-          <div id="stat-free-players" class="text-2xl font-black text-amber-600 mt-1">0 <span class="text-xs font-normal text-slate-500">名</span></div>
-        </div>
-        <div class="bg-white p-4 rounded-2xl card-shadow border border-slate-200/80">
-          <div class="text-xs text-emerald-600 font-bold">対戦中</div>
-          <div id="stat-in-game" class="text-2xl font-black text-emerald-600 mt-1">0 <span class="text-xs font-normal text-slate-500">名</span></div>
-        </div>
-        <div class="bg-white p-4 rounded-2xl card-shadow border border-slate-200/80">
-          <div class="text-xs text-indigo-600 font-bold">総成立卓数</div>
-          <div id="stat-total-rounds" class="text-2xl font-black text-indigo-600 mt-1">0 <span class="text-xs font-normal text-slate-500">卓</span></div>
-        </div>
-      </div>
-
-      <!-- Quick Operational Controls -->
-      <div class="bg-slate-900 text-white rounded-2xl p-5 card-shadow space-y-4">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 class="text-lg font-black flex items-center">
-              <i class="fa-solid fa-wand-magic-sparkles text-amber-400 mr-2"></i>
-              自動マッチング コントロール
-            </h2>
-            <p class="text-xs text-slate-400 mt-0.5">「空き」が4名揃うと自動実行されます。端数の強制組み合わせも可能です。</p>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <button onclick="triggerAutoMatch()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-xl font-bold text-xs md:text-sm shadow-md transition flex items-center space-x-1.5">
-              <i class="fa-solid fa-play"></i>
-              <span>即時マッチング (4人卓)</span>
-            </button>
-            <button onclick="triggerForceThreePlayerMatch()" class="px-3 py-2.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center space-x-1">
-              <i class="fa-solid fa-users-viewfinder"></i>
-              <span>端数(3人)を強制作成</span>
-            </button>
+        <div class="border-t border-slate-100 pt-3">
+          <p class="text-xs text-slate-500 mb-2">リストに名前がない場合はこちら：</p>
+          <div class="flex gap-2">
+            <input type="text" id="new-user-name" placeholder="ハンドルネーム" class="flex-1 p-2 border border-slate-300 rounded-lg text-sm">
+            <button onclick="registerSelf()" class="px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-lg">エントリー</button>
           </div>
         </div>
       </div>
 
-      <!-- Admin Layout: Add Player & Active Match Management -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <!-- Left Column: Bulk Add & Tools -->
-        <div class="space-y-6 lg:col-span-1">
-          <!-- Add Participant Form -->
-          <div class="bg-white rounded-2xl p-5 card-shadow border border-slate-200/80 space-y-3">
-            <h3 class="font-bold text-slate-800 text-sm flex items-center">
-              <i class="fa-solid fa-user-plus text-indigo-500 mr-2"></i>
-              運営側での参加者登録
-            </h3>
-            <form id="add-player-form" onsubmit="handleAddPlayer(event)" class="space-y-3">
-              <div>
-                <label class="block text-xs font-bold text-slate-500 mb-1">名前（複数行で一括登録可）</label>
-                <textarea id="new-player-names" required rows="3" placeholder="サトシ&#10;カスミ&#10;タケシ" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
-              </div>
-              <button type="submit" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs transition">
-                登録する
-              </button>
-            </form>
-          </div>
+      <div id="participant-status-card" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 text-center hidden">
+        <div id="status-content"></div>
+      </div>
+    </main>
 
-          <!-- Utility Tools -->
-          <div class="bg-white rounded-2xl p-5 card-shadow border border-slate-200/80 space-y-3">
-            <h3 class="font-bold text-slate-800 text-sm flex items-center">
-              <i class="fa-solid fa-screwdriver-wrench text-slate-500 mr-2"></i>
-              運営便利ツール
-            </h3>
-            <div class="grid grid-cols-1 gap-2">
-              <button onclick="loadDemoData()" class="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition text-left flex items-center justify-between">
-                <span><i class="fa-solid fa-flask text-indigo-500 mr-1.5"></i> テスト用デモデータを投入</span>
-                <i class="fa-solid fa-angle-right text-slate-400"></i>
-              </button>
-              <button onclick="exportMatchHistoryCSV()" class="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition text-left flex items-center justify-between">
-                <span><i class="fa-solid fa-file-csv text-emerald-600 mr-1.5"></i> 対戦履歴CSV出力</span>
-                <i class="fa-solid fa-download text-slate-400"></i>
-              </button>
-              <button onclick="clearAllData()" class="w-full py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition text-left flex items-center justify-between">
-                <span><i class="fa-solid fa-trash-can text-rose-500 mr-1.5"></i> 全データをリセット</span>
-                <i class="fa-solid fa-triangle-exclamation text-rose-400"></i>
-              </button>
-            </div>
+    <!-- 2. 運営画面 -->
+    <main id="view-admin" class="space-y-4 hidden">
+      <!-- ナビゲーション -->
+      <div class="flex border-b border-slate-200 bg-white rounded-t-xl px-2">
+        <button onclick="switchAdminTab('dashboard')" id="tab-dashboard" class="px-4 py-3 text-xs font-bold border-b-2 border-blue-600 text-blue-600">ダッシュボード</button>
+        <button onclick="switchAdminTab('players')" id="tab-players" class="px-4 py-3 text-xs font-bold text-slate-500 border-b-2 border-transparent">参加者管理</button>
+        <button onclick="switchAdminTab('config')" id="tab-config" class="px-4 py-3 text-xs font-bold text-slate-500 border-b-2 border-transparent">⚙️ 設定 / API接続</button>
+      </div>
+
+      <!-- ダッシュボードパネル -->
+      <div id="admin-panel-dashboard" class="space-y-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="bg-white p-3 rounded-xl border border-slate-200 text-center">
+            <div class="text-xs text-slate-400">総参加者</div>
+            <div id="stat-total" class="text-xl font-black text-slate-700">0</div>
+          </div>
+          <div class="bg-white p-3 rounded-xl border border-slate-200 text-center">
+            <div class="text-xs text-slate-400">待機中（空き）</div>
+            <div id="stat-free" class="text-xl font-black text-amber-600">0</div>
+          </div>
+          <div class="bg-white p-3 rounded-xl border border-slate-200 text-center">
+            <div class="text-xs text-slate-400">対戦中</div>
+            <div id="stat-playing" class="text-xl font-black text-blue-600">0</div>
+          </div>
+          <div class="bg-white p-3 rounded-xl border border-slate-200 text-center">
+            <div class="text-xs text-slate-400">稼働卓数</div>
+            <div id="stat-tables" class="text-xl font-black text-emerald-600">0</div>
           </div>
         </div>
 
-        <!-- Right Column: Active Tables & Participant List -->
-        <div class="space-y-6 lg:col-span-2">
-          <!-- Active Tables Display -->
-          <div class="bg-white rounded-2xl p-5 card-shadow border border-slate-200/80 space-y-4">
-            <div class="flex items-center justify-between">
-              <h3 class="font-bold text-slate-800 text-base flex items-center">
-                <i class="fa-solid fa-dice-d6 text-indigo-500 mr-2"></i>
-                進行中の対戦卓
-              </h3>
-              <span class="text-xs text-slate-400">強制完了も可能です</span>
-            </div>
-            <div id="admin-active-tables" class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <!-- Populated via JS -->
-            </div>
-          </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 flex gap-2">
+          <button onclick="triggerMatch(false)" class="flex-1 py-3 bg-blue-600 text-white font-bold rounded-lg text-sm shadow-sm">4人卓 マッチング実行</button>
+          <button onclick="triggerMatch(true)" class="py-3 px-4 bg-amber-500 text-white font-bold rounded-lg text-xs">端数(3人卓)作成</button>
+        </div>
 
-          <!-- All Participants Management Table -->
-          <div class="bg-white rounded-2xl p-5 card-shadow border border-slate-200/80 space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <h3 class="font-bold text-slate-800 text-base flex items-center">
-                <i class="fa-solid fa-users text-indigo-500 mr-2"></i>
-                参加者一覧 & ステータス管理
-              </h3>
-              <div class="flex space-x-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
-                <button onclick="setPlayerFilter('ALL')" id="filter-ALL" class="px-2.5 py-1 rounded-lg bg-white text-slate-800 shadow-sm">すべて</button>
-                <button onclick="setPlayerFilter('FREE')" id="filter-FREE" class="px-2.5 py-1 rounded-lg text-slate-500">空き</button>
-                <button onclick="setPlayerFilter('IN_GAME')" id="filter-IN_GAME" class="px-2.5 py-1 rounded-lg text-slate-500">対戦中</button>
-                <button onclick="setPlayerFilter('PAUSED')" id="filter-PAUSED" class="px-2.5 py-1 rounded-lg text-slate-500">離脱</button>
-              </div>
-            </div>
-
-            <div class="overflow-x-auto">
-              <table class="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr class="border-b border-slate-200 text-slate-400 font-bold">
-                    <th class="py-2.5 px-3">名前</th>
-                    <th class="py-2.5 px-3">状態</th>
-                    <th class="py-2.5 px-3 text-center">対戦数</th>
-                    <th class="py-2.5 px-3">卓</th>
-                    <th class="py-2.5 px-3 text-right">操作</th>
-                  </tr>
-                </thead>
-                <tbody id="admin-player-table-body" class="divide-y divide-slate-100">
-                  <!-- Dynamic rows -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Match History Log -->
-          <div class="bg-white rounded-2xl p-5 card-shadow border border-slate-200/80 space-y-3">
-            <h3 class="font-bold text-slate-800 text-sm flex items-center">
-              <i class="fa-solid fa-clock-rotate-left text-indigo-500 mr-2"></i>
-              対戦履歴ログ
-            </h3>
-            <div class="overflow-y-auto max-h-52 border border-slate-100 rounded-xl">
-              <table class="w-full text-left text-xs">
-                <thead class="bg-slate-50 text-slate-500 sticky top-0 font-bold">
-                  <tr>
-                    <th class="py-2 px-3">時刻</th>
-                    <th class="py-2 px-3">卓番号</th>
-                    <th class="py-2 px-3">対戦者メンバー</th>
-                  </tr>
-                </thead>
-                <tbody id="admin-history-log" class="divide-y divide-slate-100">
-                  <!-- Match log populated here -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-
+        <div class="bg-white p-4 rounded-xl border border-slate-200">
+          <h3 class="font-bold text-slate-700 mb-3 text-sm">進行中の対戦卓</h3>
+          <div id="active-tables-list" class="grid md:grid-cols-2 gap-3"></div>
         </div>
       </div>
-    </section>
 
-  </main>
+      <!-- 参加者管理パネル -->
+      <div id="admin-panel-players" class="space-y-4 hidden">
+        <div class="bg-white p-4 rounded-xl border border-slate-200">
+          <h3 class="font-bold text-slate-700 mb-2 text-sm">一括追加（改行区切り）</h3>
+          <textarea id="bulk-players-input" rows="3" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono mb-2" placeholder="サトシ&#10;カスミ&#10;タケシ"></textarea>
+          <button onclick="bulkRegister()" class="w-full py-2 bg-slate-800 text-white font-bold text-xs rounded-lg">一括登録実行</button>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200">
+          <h3 class="font-bold text-slate-700 mb-3 text-sm">参加者一覧</h3>
+          <div id="players-table-container" class="overflow-x-auto"></div>
+        </div>
+      </div>
+
+      <!-- 設定/API接続パネル -->
+      <div id="admin-panel-config" class="space-y-4 hidden">
+        <div class="bg-white p-5 rounded-xl border border-slate-200">
+          <h3 class="font-bold text-slate-700 mb-2 text-sm">Google Apps Script (GAS) API URL設定</h3>
+          <p class="text-xs text-slate-500 mb-3">デプロイ時に発行された「ウェブアプリ URL」を貼り付けて保存してください。</p>
+          <input type="url" id="gas-url-input" placeholder="https://script.google.com/macros/s/.../exec" class="w-full p-2.5 border border-slate-300 rounded-lg text-xs mb-3 font-mono">
+          <button onclick="saveGasUrl()" class="w-full py-2.5 bg-blue-600 text-white font-bold text-xs rounded-lg">保存して接続テスト</button>
+        </div>
+        <div class="bg-red-50 p-4 rounded-xl border border-red-200">
+          <h3 class="font-bold text-red-700 mb-1 text-sm">データ初期化</h3>
+          <p class="text-xs text-red-600 mb-2">スプレッドシート内の全対戦データ・参加者をクリアします。</p>
+          <button onclick="resetData()" class="py-2 px-4 bg-red-600 text-white font-bold text-xs rounded-lg">全データクリア</button>
+        </div>
+      </div>
+    </main>
+  </div>
 
   <script>
-    // LocalStorage Keys
-    const STORAGE_KEY_PLAYERS = 'tcg_self_players_v2';
-    const STORAGE_KEY_TABLES = 'tcg_self_tables_v2';
-    const STORAGE_KEY_LOGS = 'tcg_self_logs_v2';
-
-    // State Variables
-    let players = [];
-    let activeTables = [];
-    let matchLogs = [];
-    let currentView = 'participant';
-    let currentFilter = 'ALL';
-    let selectedParticipantId = null;
+    let appState = { players: [], matches: [] };
+    let currentUser = "";
+    let gasApiUrl = localStorage.getItem("tcg_gas_api_url") || "";
 
     window.onload = function() {
-      loadState();
-      
-      // Auto-restore last selected player from session if available
-      const savedPlayerId = sessionStorage.getItem('current_player_id');
-      if (savedPlayerId && players.some(p => p.id === savedPlayerId)) {
-        selectedParticipantId = savedPlayerId;
-      }
-
-      renderApp();
-
-      // Poll state every 3 seconds for active sync across tabs/devices
-      setInterval(() => {
-        loadState();
-        renderApp();
-      }, 3000);
+      document.getElementById("gas-url-input").value = gasApiUrl;
+      updateApiStatusBar();
+      if (gasApiUrl) fetchData();
     };
 
-    function loadState() {
+    function updateApiStatusBar() {
+      const bar = document.getElementById("api-status-bar");
+      if (gasApiUrl) {
+        bar.className = "mb-4 p-2.5 rounded-lg text-xs font-semibold flex items-center justify-between bg-emerald-50 text-emerald-800 border border-emerald-200";
+        bar.innerHTML = `<span>✅ スプレッドシート連携済み</span> <button onclick="fetchData()" class="underline text-emerald-900">再読み込み</button>`;
+      } else {
+        bar.className = "mb-4 p-2.5 rounded-lg text-xs font-semibold flex items-center justify-between bg-amber-50 text-amber-800 border border-amber-200";
+        bar.innerHTML = `<span>⚠️ API URL未設定です。「運営画面 → 設定 / API接続」でURLを登録してください。</span>`;
+      }
+    }
+
+    function saveGasUrl() {
+      const url = document.getElementById("gas-url-input").value.trim();
+      if (!url) return alert("URLを入力してください");
+      gasApiUrl = url;
+      localStorage.setItem("tcg_gas_api_url", gasApiUrl);
+      updateApiStatusBar();
+      fetchData();
+      alert("API URLを保存しました");
+    }
+
+    async function apiRequest(action, payload = {}) {
+      if (!gasApiUrl) return;
       try {
-        const pData = localStorage.getItem(STORAGE_KEY_PLAYERS);
-        const tData = localStorage.getItem(STORAGE_KEY_TABLES);
-        const lData = localStorage.getItem(STORAGE_KEY_LOGS);
-
-        players = pData ? JSON.parse(pData) : [];
-        activeTables = tData ? JSON.parse(tData) : [];
-        matchLogs = lData ? JSON.parse(lData) : [];
-      } catch (e) {
-        console.error("Failed to parse state", e);
+        if (action === "getData") {
+          const res = await fetch(`${gasApiUrl}?action=getData`);
+          const data = await res.json();
+          appState = data;
+          renderApp();
+        } else {
+          const res = await fetch(gasApiUrl, {
+            method: "POST",
+            body: JSON.stringify({ action: action, ...payload })
+          });
+          const data = await res.json();
+          if (data.data) {
+            appState = data.data;
+            renderApp();
+          }
+        }
+      } catch (err) {
+        console.error("API Error:", err);
       }
     }
 
-    function saveState() {
-      localStorage.setItem(STORAGE_KEY_PLAYERS, JSON.stringify(players));
-      localStorage.setItem(STORAGE_KEY_TABLES, JSON.stringify(activeTables));
-      localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(matchLogs));
-    }
-
-    function switchView(viewName) {
-      currentView = viewName;
-      const partSec = document.getElementById('view-participant');
-      const adminSec = document.getElementById('view-admin');
-      const partBtn = document.getElementById('nav-participant-btn');
-      const adminBtn = document.getElementById('nav-admin-btn');
-
-      if (viewName === 'participant') {
-        partSec.classList.remove('hidden');
-        adminSec.classList.add('hidden');
-
-        partBtn.className = "px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold transition-all duration-200 flex items-center space-x-1 bg-indigo-600 text-white shadow";
-        adminBtn.className = "px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold transition-all duration-200 flex items-center space-x-1 text-slate-400 hover:text-white";
-      } else {
-        partSec.classList.add('hidden');
-        adminSec.classList.remove('hidden');
-
-        adminBtn.className = "px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold transition-all duration-200 flex items-center space-x-1 bg-indigo-600 text-white shadow";
-        partBtn.className = "px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold transition-all duration-200 flex items-center space-x-1 text-slate-400 hover:text-white";
-      }
-      renderApp();
-    }
-
-    function toggleSelectExistingMode() {
-      const entryCard = document.getElementById('entry-form-card');
-      const selectCard = document.getElementById('select-player-card');
-
-      if (entryCard.classList.contains('hidden')) {
-        entryCard.classList.remove('hidden');
-        selectCard.classList.add('hidden');
-      } else {
-        entryCard.classList.add('hidden');
-        selectCard.classList.remove('hidden');
-      }
-    }
-
-    function handleSelfEntry(e) {
-      e.preventDefault();
-      const input = document.getElementById('self-entry-name');
-      const name = input.value.trim();
-
-      if (!name) return;
-
-      // Check for existing player name
-      let player = players.find(p => p.name === name);
-
-      if (player) {
-        // If already exists, switch directly
-        selectedParticipantId = player.id;
-        showToast(`${name} さんのエントリーを確認しました`);
-      } else {
-        // Create new player
-        player = {
-          id: 'p_' + Date.now() + '_' + Math.floor(Math.random()*1000),
-          name: name,
-          status: 'FREE',
-          matchCount: 0,
-          currentTableId: null,
-          historyOpponents: {}
-        };
-        players.push(player);
-        selectedParticipantId = player.id;
-        showToast(`${name} さんを登録して待機列に追加しました！`);
-      }
-
-      sessionStorage.setItem('current_player_id', selectedParticipantId);
-      input.value = '';
-      saveState();
-
-      // Trigger auto match check
-      autoMatchEngine();
-      renderApp();
-    }
+    function fetchData() { apiRequest("getData"); }
 
     function renderApp() {
-      if (currentView === 'participant') {
-        renderParticipantView();
-      } else {
-        renderAdminView();
-      }
-    }
-
-    function renderParticipantView() {
-      const selectEl = document.getElementById('participant-select');
-      const currentSelected = selectEl.value;
-      
-      selectEl.innerHTML = '<option value="">-- ハンドルネームを選択 --</option>';
-      players.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = `${p.name} (${getStatusLabel(p.status)})`;
-        if (p.id === currentSelected || p.id === selectedParticipantId) {
-          opt.selected = true;
-        }
-        selectEl.appendChild(opt);
+      // ユーザー選択肢
+      const select = document.getElementById("user-select");
+      const currentVal = select.value;
+      select.innerHTML = '<option value="">-- 名前を選択してください --</option>';
+      appState.players.forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p.name;
+        opt.textContent = `${p.name} (対戦数: ${p.count})`;
+        if (p.name === currentVal) opt.selected = true;
+        select.appendChild(opt);
       });
 
-      if (!selectedParticipantId && selectEl.value) {
-        selectedParticipantId = selectEl.value;
-      }
+      renderParticipantCard();
+      renderStats();
+      renderActiveTables();
+      renderPlayersTable();
+    }
 
-      const cardEl = document.getElementById('participant-status-card');
+    function onUserSelect() {
+      currentUser = document.getElementById("user-select").value;
+      renderParticipantCard();
+    }
 
-      if (!selectedParticipantId) {
-        cardEl.classList.add('hidden');
+    function renderParticipantCard() {
+      const card = document.getElementById("participant-status-card");
+      const content = document.getElementById("status-content");
+      if (!currentUser) { card.classList.add("hidden"); return; }
+
+      card.classList.remove("hidden");
+      const player = appState.players.find(p => p.name === currentUser);
+      if (!player) return;
+
+      if (player.status === "対戦中") {
+        content.innerHTML = `
+          <div class="text-xs font-bold text-blue-600 mb-1">マッチング完了！</div>
+          <div class="text-3xl font-black text-blue-700 mb-2">${player.table}</div>
+          <p class="text-xs text-slate-500 mb-4">指定の卓へ移動して対戦を開始してください。</p>
+          <button onclick="setStatus('${player.name}', '空き')" class="w-full py-3 bg-blue-600 text-white font-bold rounded-lg text-sm shadow">対戦終了（次の対戦を待つ）</button>
+        `;
+      } else if (player.status === "空き") {
+        content.innerHTML = `
+          <div class="text-xs font-bold text-amber-600 mb-1">マッチング待機中...</div>
+          <div class="text-lg font-bold text-slate-700 mb-2">4人集まり次第、卓が決定します</div>
+          <button onclick="setStatus('${player.name}', '離脱')" class="py-2 px-4 bg-slate-200 text-slate-600 text-xs font-bold rounded-lg">一時離脱 / 休憩</button>
+        `;
       } else {
-        const p = players.find(x => x.id === selectedParticipantId);
-        if (!p) {
-          cardEl.classList.add('hidden');
-        } else {
-          cardEl.classList.remove('hidden');
-          document.getElementById('player-card-name').innerText = p.name;
-          document.getElementById('player-card-count').innerText = p.matchCount || 0;
-
-          const displayArea = document.getElementById('status-display-area');
-          const finishBtn = document.getElementById('btn-finish-game');
-          const togglePauseBtn = document.getElementById('btn-toggle-pause');
-
-          if (p.status === 'IN_GAME') {
-            const table = activeTables.find(t => t.id === p.currentTableId);
-            const tableName = table ? table.tableName : '対戦卓';
-            displayArea.innerHTML = `
-              <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl p-4 pulse-animation">
-                <div class="text-[10px] font-black text-emerald-600 uppercase tracking-wide">現在のステータス</div>
-                <div class="text-2xl font-black text-emerald-700 my-1"><i class="fa-solid fa-dice text-emerald-500 mr-2"></i>${tableName} で対戦中</div>
-                <p class="text-xs text-emerald-600 font-medium">対戦が終わったら「対戦終了」を押してください。</p>
-              </div>
-            `;
-            finishBtn.disabled = false;
-            finishBtn.className = "w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center space-x-2";
-            togglePauseBtn.innerText = "一時離脱（休憩する）";
-          } else if (p.status === 'FREE') {
-            const freeCount = players.filter(x => x.status === 'FREE').length;
-            displayArea.innerHTML = `
-              <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4">
-                <div class="text-[10px] font-black text-amber-600 uppercase tracking-wide">現在のステータス</div>
-                <div class="text-lg font-black text-amber-700 my-1"><i class="fa-solid fa-hourglass-half mr-2"></i>マッチング待機中...</div>
-                <p class="text-xs text-amber-600">現在待機中: <strong>${freeCount}名</strong> (4名揃い次第、即案内)</p>
-              </div>
-            `;
-            finishBtn.disabled = true;
-            finishBtn.className = "w-full py-4 bg-slate-200 text-slate-400 rounded-xl font-bold text-lg cursor-not-allowed flex items-center justify-center space-x-2";
-            togglePauseBtn.innerText = "一時離脱（休憩する）";
-          } else { // PAUSED
-            displayArea.innerHTML = `
-              <div class="bg-slate-100 border border-slate-200 text-slate-600 rounded-2xl p-4">
-                <div class="text-[10px] font-black text-slate-400 uppercase tracking-wide">現在のステータス</div>
-                <div class="text-base font-bold text-slate-700 my-1"><i class="fa-solid fa-mug-hot mr-2"></i>一時休憩中</div>
-                <p class="text-xs text-slate-500">対戦を再開する場合は下のボタンを押してください。</p>
-              </div>
-            `;
-            finishBtn.disabled = true;
-            finishBtn.className = "w-full py-4 bg-slate-200 text-slate-400 rounded-xl font-bold text-lg cursor-not-allowed flex items-center justify-center space-x-2";
-            togglePauseBtn.innerText = "対戦に復帰する（空き状態へ）";
-          }
-        }
-      }
-
-      // Render Active Tables list
-      const tablesListEl = document.getElementById('participant-tables-list');
-      document.getElementById('active-table-count').innerText = `${activeTables.length}卓`;
-
-      if (activeTables.length === 0) {
-        tablesListEl.innerHTML = `<div class="text-center py-6 text-slate-400 text-xs font-medium">現在対戦中の卓はありません</div>`;
-      } else {
-        tablesListEl.innerHTML = activeTables.map(t => {
-          const memberNames = t.playerIds.map(id => {
-            const p = players.find(x => x.id === id);
-            return p ? p.name : '未知';
-          }).join(', ');
-
-          return `
-            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex justify-between items-center">
-              <div>
-                <span class="font-extrabold text-sm text-indigo-700">${t.tableName}</span>
-                <p class="text-xs text-slate-600 mt-0.5 font-medium"><i class="fa-solid fa-users text-slate-400 mr-1"></i> ${memberNames}</p>
-              </div>
-              <span class="text-[11px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">対戦中</span>
-            </div>
-          `;
-        }).join('');
+        content.innerHTML = `
+          <div class="text-xs font-bold text-slate-400 mb-1">現在休憩・離脱中</div>
+          <button onclick="setStatus('${player.name}', '空き')" class="w-full py-3 bg-emerald-600 text-white font-bold rounded-lg text-sm shadow">対戦を再開する</button>
+        `;
       }
     }
 
-    function onParticipantSelect() {
-      const selectEl = document.getElementById('participant-select');
-      selectedParticipantId = selectEl.value;
-      if (selectedParticipantId) {
-        sessionStorage.setItem('current_player_id', selectedParticipantId);
-      }
-      renderParticipantView();
+    function setStatus(name, status) { apiRequest("setStatus", { name, status }); }
+    function registerSelf() {
+      const name = document.getElementById("new-user-name").value.trim();
+      if (!name) return;
+      currentUser = name;
+      apiRequest("register", { name });
+      document.getElementById("new-user-name").value = "";
     }
 
-    function participantFinishMatch() {
-      if (!selectedParticipantId) return;
-      const p = players.find(x => x.id === selectedParticipantId);
-      if (!p || p.status !== 'IN_GAME') return;
+    function triggerMatch(forceThree) { apiRequest("match", { forceThree }); }
+    function resetData() { if (confirm("本当に全データを消去しますか？")) apiRequest("reset"); }
 
-      p.status = 'FREE';
-      
-      const tableIndex = activeTables.findIndex(t => t.id === p.currentTableId);
-      if (tableIndex !== -1) {
-        const table = activeTables[tableIndex];
-        p.currentTableId = null;
-
-        const remainingInGame = players.filter(x => x.currentTableId === table.id && x.status === 'IN_GAME');
-        if (remainingInGame.length === 0) {
-          activeTables.splice(tableIndex, 1);
-        }
-      }
-
-      saveState();
-      showToast(`${p.name} さんの対戦を完了しました`);
-
-      autoMatchEngine();
-      renderApp();
+    function renderStats() {
+      document.getElementById("stat-total").textContent = appState.players.length;
+      document.getElementById("stat-free").textContent = appState.players.filter(p => p.status === "空き").length;
+      document.getElementById("stat-playing").textContent = appState.players.filter(p => p.status === "対戦中").length;
+      const activeTables = new Set(appState.players.filter(p => p.status === "対戦中").map(p => p.table));
+      document.getElementById("stat-tables").textContent = activeTables.size;
     }
 
-    function participantTogglePause() {
-      if (!selectedParticipantId) return;
-      const p = players.find(x => x.id === selectedParticipantId);
-      if (!p) return;
-
-      if (p.status === 'PAUSED') {
-        p.status = 'FREE';
-        showToast(`${p.name} さんが待機列に復帰しました`);
-      } else if (p.status === 'FREE') {
-        p.status = 'PAUSED';
-        showToast(`${p.name} さんが休憩状態になりました`);
-      } else if (p.status === 'IN_GAME') {
-        if (confirm("現在対戦中ですが、対戦を完了にして休憩に入りますか？")) {
-          p.status = 'PAUSED';
-          p.currentTableId = null;
-          showToast(`${p.name} さんの対戦を完了し休憩に切り替えました`);
-        } else {
-          return;
-        }
-      }
-
-      saveState();
-      autoMatchEngine();
-      renderApp();
-    }
-
-    function renderAdminView() {
-      document.getElementById('stat-total-players').innerHTML = `${players.length} <span class="text-xs font-normal text-slate-500">名</span>`;
-      document.getElementById('stat-free-players').innerHTML = `${players.filter(p => p.status === 'FREE').length} <span class="text-xs font-normal text-slate-500">名</span>`;
-      document.getElementById('stat-in-game').innerHTML = `${players.filter(p => p.status === 'IN_GAME').length} <span class="text-xs font-normal text-slate-500">名</span>`;
-      document.getElementById('stat-total-rounds').innerHTML = `${matchLogs.length} <span class="text-xs font-normal text-slate-500">卓</span>`;
-
-      // Active Tables Admin
-      const activeTablesContainer = document.getElementById('admin-active-tables');
-      if (activeTables.length === 0) {
-        activeTablesContainer.innerHTML = `<div class="col-span-2 text-center py-6 text-slate-400 text-xs">稼働中の卓はありません</div>`;
-      } else {
-        activeTablesContainer.innerHTML = activeTables.map(t => {
-          const membersHtml = t.playerIds.map(id => {
-            const p = players.find(x => x.id === id);
-            return `<span class="bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-700 font-bold mr-1 mb-1 inline-block">${p ? p.name : '未知'}</span>`;
-          }).join('');
-
-          return `
-            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
-              <div>
-                <div class="flex justify-between items-center mb-1.5">
-                  <span class="font-bold text-indigo-700 text-sm">${t.tableName}</span>
-                  <span class="text-[10px] text-slate-400 font-medium">${t.startTime} 作成</span>
-                </div>
-                <div class="text-xs flex flex-wrap mb-1">${membersHtml}</div>
-              </div>
-              <button onclick="adminCloseTable('${t.id}')" class="w-full mt-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold transition">
-                卓を強制終了する
-              </button>
-            </div>
-          `;
-        }).join('');
-      }
-
-      // Player Management Table
-      const tbody = document.getElementById('admin-player-table-body');
-      let filtered = players;
-      if (currentFilter !== 'ALL') {
-        filtered = players.filter(p => p.status === currentFilter);
-      }
-
-      if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-400 text-xs">該当する参加者はいません</td></tr>`;
-      } else {
-        tbody.innerHTML = filtered.map(p => {
-          let statusBadge = '';
-          if (p.status === 'FREE') statusBadge = '<span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">空き</span>';
-          else if (p.status === 'IN_GAME') statusBadge = '<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">対戦中</span>';
-          else statusBadge = '<span class="bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold">離脱</span>';
-
-          const currentTable = activeTables.find(t => t.id === p.currentTableId);
-          const tableName = currentTable ? currentTable.tableName : '-';
-
-          return `
-            <tr class="hover:bg-slate-50">
-              <td class="py-2.5 px-3 font-bold text-slate-800">${p.name}</td>
-              <td class="py-2.5 px-3">${statusBadge}</td>
-              <td class="py-2.5 px-3 text-center font-black text-indigo-600">${p.matchCount || 0}</td>
-              <td class="py-2.5 px-3 font-bold text-slate-600">${tableName}</td>
-              <td class="py-2.5 px-3 text-right space-x-1">
-                <button onclick="adminTogglePlayerStatus('${p.id}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold">
-                  切替
-                </button>
-                <button onclick="adminDeletePlayer('${p.id}')" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold">
-                  削除
-                </button>
-              </td>
-            </tr>
-          `;
-        }).join('');
-      }
-
-      // Log
-      const logBody = document.getElementById('admin-history-log');
-      if (matchLogs.length === 0) {
-        logBody.innerHTML = `<tr><td colspan="3" class="py-4 text-center text-slate-400 text-xs">履歴ログはありません</td></tr>`;
-      } else {
-        logBody.innerHTML = matchLogs.slice().reverse().map(log => `
-          <tr class="hover:bg-slate-50">
-            <td class="py-2 px-3 text-slate-400 text-[10px] font-medium">${log.timestamp}</td>
-            <td class="py-2 px-3 font-bold text-indigo-600">${log.tableName}</td>
-            <td class="py-2 px-3 text-slate-700 font-bold">${log.playerNames.join(', ')}</td>
-          </tr>
-        `).join('');
-      }
-    }
-
-    function setPlayerFilter(filter) {
-      currentFilter = filter;
-      ['ALL', 'FREE', 'IN_GAME', 'PAUSED'].forEach(f => {
-        const btn = document.getElementById(`filter-${f}`);
-        if (f === filter) {
-          btn.className = "px-2.5 py-1 rounded-lg bg-white text-slate-800 shadow-sm";
-        } else {
-          btn.className = "px-2.5 py-1 rounded-lg text-slate-500";
-        }
-      });
-      renderAdminView();
-    }
-
-    function handleAddPlayer(e) {
-      e.preventDefault();
-      const textarea = document.getElementById('new-player-names');
-      const lines = textarea.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-
-      if (lines.length === 0) return;
-
-      let addedCount = 0;
-      lines.forEach(name => {
-        if (!players.some(p => p.name === name)) {
-          players.push({
-            id: 'p_' + Date.now() + '_' + Math.floor(Math.random()*1000),
-            name: name,
-            status: 'FREE',
-            matchCount: 0,
-            currentTableId: null,
-            historyOpponents: {}
-          });
-          addedCount++;
-        }
+    function renderActiveTables() {
+      const container = document.getElementById("active-tables-list");
+      container.innerHTML = "";
+      const tableMap = {};
+      appState.players.filter(p => p.status === "対戦中").forEach(p => {
+        if (!tableMap[p.table]) tableMap[p.table] = [];
+        tableMap[p.table].push(p.name);
       });
 
-      saveState();
-      textarea.value = '';
-      showToast(`${addedCount}名の参加者を登録しました`);
-
-      autoMatchEngine();
-      renderApp();
-    }
-
-    function adminTogglePlayerStatus(playerId) {
-      const p = players.find(x => x.id === playerId);
-      if (!p) return;
-
-      if (p.status === 'FREE') p.status = 'PAUSED';
-      else if (p.status === 'PAUSED') p.status = 'FREE';
-      else if (p.status === 'IN_GAME') {
-        p.status = 'FREE';
-        p.currentTableId = null;
-      }
-
-      saveState();
-      autoMatchEngine();
-      renderApp();
-    }
-
-    function adminDeletePlayer(playerId) {
-      const p = players.find(x => x.id === playerId);
-      if (!p) return;
-
-      if (confirm(`${p.name} さんを削除しますか？`)) {
-        players = players.filter(x => x.id !== playerId);
-        saveState();
-        renderApp();
-        showToast(`${p.name} さんを削除しました`);
-      }
-    }
-
-    function adminCloseTable(tableId) {
-      const tableIndex = activeTables.findIndex(t => t.id === tableId);
-      if (tableIndex === -1) return;
-
-      const table = activeTables[tableIndex];
-      table.playerIds.forEach(id => {
-        const p = players.find(x => x.id === id);
-        if (p) {
-          p.status = 'FREE';
-          p.currentTableId = null;
-        }
-      });
-
-      activeTables.splice(tableIndex, 1);
-      saveState();
-      showToast(`${table.tableName} を強制終了しました`);
-
-      autoMatchEngine();
-      renderApp();
-    }
-
-    function triggerAutoMatch() {
-      const matched = autoMatchEngine(true);
-      if (!matched) {
-        alert("マッチング可能な「空き」参加者が4人未満です。");
-      }
-    }
-
-    function triggerForceThreePlayerMatch() {
-      const freePlayers = players.filter(p => p.status === 'FREE');
-      if (freePlayers.length < 3) {
-        alert("端数救済には最低3人の「空き」参加者が準備されている必要があります。");
+      if (Object.keys(tableMap).length === 0) {
+        container.innerHTML = '<div class="text-xs text-slate-400 col-span-2 text-center py-4">現在稼働中の卓はありません</div>';
         return;
       }
 
-      executeMatchGroup(3);
+      for (let table in tableMap) {
+        const div = document.createElement("div");
+        div.className = "p-3 bg-slate-50 border border-slate-200 rounded-lg";
+        div.innerHTML = `<div class="font-bold text-xs text-blue-600 mb-1">${table}</div><div class="text-xs text-slate-700">${tableMap[table].join(" / ")}</div>`;
+        container.appendChild(div);
+      }
     }
 
-    function autoMatchEngine(forceNotice = false) {
-      let matchCreated = false;
-
-      while (true) {
-        const freePlayers = players.filter(p => p.status === 'FREE');
-        if (freePlayers.length < 4) break;
-
-        const success = executeMatchGroup(4);
-        if (success) matchCreated = true;
-        else break;
-      }
-
-      if (matchCreated) {
-        saveState();
-        renderApp();
-      }
-
-      return matchCreated;
-    }
-
-    function executeMatchGroup(groupSize) {
-      const freePlayers = players.filter(p => p.status === 'FREE');
-      if (freePlayers.length < groupSize) return false;
-
-      // Prioritize players with fewer match counts + random jitter
-      freePlayers.sort((a, b) => {
-        if (a.matchCount !== b.matchCount) {
-          return a.matchCount - b.matchCount;
-        }
-        return Math.random() - 0.5;
+    function renderPlayersTable() {
+      const container = document.getElementById("players-table-container");
+      let html = `<table class="w-full text-xs text-left"><thead><tr class="border-b border-slate-200"><th class="py-2">名前</th><th>状態</th><th>卓</th><th>対戦数</th></tr></thead><tbody>`;
+      appState.players.forEach(p => {
+        html += `<tr class="border-b border-slate-100"><td class="py-2 font-bold">${p.name}</td><td>${p.status}</td><td>${p.table}</td><td>${p.count}回</td></tr>`;
       });
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+    }
 
-      const selected = [];
-      const seed = freePlayers.shift();
-      selected.push(seed);
+    function bulkRegister() {
+      const text = document.getElementById("bulk-players-input").value;
+      const names = text.split("\n").map(n => n.trim()).filter(n => n);
+      names.forEach(name => apiRequest("register", { name }));
+      document.getElementById("bulk-players-input").value = "";
+    }
 
-      while (selected.length < groupSize && freePlayers.length > 0) {
-        let bestIndex = 0;
-        let lowestScore = Infinity;
+    function switchView(view) {
+      document.getElementById("view-participant").classList.toggle("hidden", view !== "participant");
+      document.getElementById("view-admin").classList.toggle("hidden", view !== "admin");
+    }
 
-        for (let i = 0; i < freePlayers.length; i++) {
-          const candidate = freePlayers[i];
-          let score = 0;
-
-          selected.forEach(member => {
-            const historyCount = (candidate.historyOpponents && candidate.historyOpponents[member.id]) || 0;
-            score += historyCount;
-          });
-
-          score += candidate.matchCount * 0.1;
-
-          if (score < lowestScore) {
-            lowestScore = score;
-            bestIndex = i;
-          }
-        }
-
-        selected.push(freePlayers.splice(bestIndex, 1)[0]);
-      }
-
-      if (selected.length < groupSize) return false;
-
-      const tableNumber = activeTables.length + matchLogs.length + 1;
-      const tableName = `卓 ${tableNumber}`;
-      const tableId = 'tbl_' + Date.now() + '_' + Math.floor(Math.random()*1000);
-      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-      const newTable = {
-        id: tableId,
-        tableName: tableName,
-        playerIds: selected.map(p => p.id),
-        startTime: timeStr
-      };
-
-      activeTables.push(newTable);
-
-      selected.forEach(p => {
-        p.status = 'IN_GAME';
-        p.currentTableId = tableId;
-        p.matchCount = (p.matchCount || 0) + 1;
-
-        if (!p.historyOpponents) p.historyOpponents = {};
-        selected.forEach(other => {
-          if (other.id !== p.id) {
-            p.historyOpponents[other.id] = (p.historyOpponents[other.id] || 0) + 1;
-          }
-        });
+    function switchAdminTab(tab) {
+      ["dashboard", "players", "config"].forEach(t => {
+        document.getElementById(`admin-panel-${t}`).classList.toggle("hidden", t !== tab);
       });
-
-      matchLogs.push({
-        id: 'log_' + Date.now(),
-        tableName: tableName,
-        timestamp: timeStr,
-        playerNames: selected.map(p => p.name)
-      });
-
-      showToast(`【${tableName}】が成立しました (${selected.map(p => p.name).join(', ')})`);
-      return true;
     }
 
-    function loadDemoData() {
-      if (confirm("テスト用デモデータ（10名）を投入しますか？")) {
-        const demoNames = ["サトシ", "カスミ", "タケシ", "ヒカリ", "ハルカ", "シンジ", "ダイゴ", "シロナ", "ワタル", "キバナ"];
-
-        players = demoNames.map((name, idx) => ({
-          id: 'p_demo_' + idx,
-          name: name,
-          status: 'FREE',
-          matchCount: 0,
-          currentTableId: null,
-          historyOpponents: {}
-        }));
-
-        activeTables = [];
-        matchLogs = [];
-
-        saveState();
-        autoMatchEngine();
-        renderApp();
-        showToast("デモデータを投入しました");
-      }
-    }
-
-    function clearAllData() {
-      if (confirm("全てのデータをリセットしますか？")) {
-        players = [];
-        activeTables = [];
-        matchLogs = [];
-        localStorage.removeItem(STORAGE_KEY_PLAYERS);
-        localStorage.removeItem(STORAGE_KEY_TABLES);
-        localStorage.removeItem(STORAGE_KEY_LOGS);
-        renderApp();
-        showToast("全データをリセットしました");
-      }
-    }
-
-    function exportMatchHistoryCSV() {
-      if (matchLogs.length === 0) {
-        alert("出力する対戦履歴がありません。");
-        return;
-      }
-
-      let csv = "\uFEFF日時,卓番号,対戦メンバー\n";
-      matchLogs.forEach(log => {
-        csv += `"${log.timestamp}","${log.tableName}","${log.playerNames.join(' / ')}"\n`;
-      });
-
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `TCG_Match_History_${new Date().toISOString().slice(0,10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    function getStatusLabel(status) {
-      if (status === 'FREE') return '空き';
-      if (status === 'IN_GAME') return '対戦中';
-      if (status === 'PAUSED') return '離脱中';
-      return status;
-    }
-
-    function showToast(message) {
-      const container = document.getElementById('toast-container');
-      const toast = document.createElement('div');
-      toast.className = "bg-slate-900 text-white text-xs px-4 py-3 rounded-xl shadow-xl flex items-center space-x-2 pointer-events-auto transform transition-all duration-300 translate-y-2 opacity-0 font-bold";
-      toast.innerHTML = `<i class="fa-solid fa-circle-info text-indigo-400"></i><span>${message}</span>`;
-      
-      container.appendChild(toast);
-
-      setTimeout(() => {
-        toast.classList.remove('translate-y-2', 'opacity-0');
-      }, 10);
-
-      setTimeout(() => {
-        toast.classList.add('opacity-0', 'translate-y-2');
-        setTimeout(() => toast.remove(), 300);
-      }, 3000);
-    }
+    // 10秒毎に自動同期
+    setInterval(fetchData, 10000);
   </script>
 </body>
 </html>
