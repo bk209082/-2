@@ -41,7 +41,7 @@
       font-size: 0.85rem;
     }
     .container {
-      max-width: 600px;
+      max-width: 650px;
       margin: 16px auto;
       padding: 0 12px;
     }
@@ -65,25 +65,32 @@
     .badge-break { background-color: #6b7280; }
     .btn {
       width: 100%;
-      padding: 12px;
+      padding: 10px;
       margin-top: 8px;
       border: none;
       border-radius: 6px;
-      font-size: 1rem;
+      font-size: 0.95rem;
       font-weight: bold;
       cursor: pointer;
       color: white;
     }
+    .btn-sm {
+      width: auto;
+      padding: 4px 8px;
+      font-size: 0.8rem;
+      margin-top: 0;
+    }
     .btn-primary { background-color: var(--secondary); }
     .btn-success { background-color: var(--success); }
     .btn-warning { background-color: var(--warning); }
+    .btn-danger { background-color: var(--danger); }
     .btn-secondary { background-color: #6b7280; }
     .btn:disabled { background-color: #d1d5db; cursor: not-allowed; }
     select, input {
       width: 100%;
-      padding: 10px;
-      margin-top: 6px;
-      margin-bottom: 12px;
+      padding: 8px;
+      margin-top: 4px;
+      margin-bottom: 10px;
       border: 1px solid #ccc;
       border-radius: 4px;
       box-sizing: border-box;
@@ -104,13 +111,28 @@
       margin-bottom: 12px;
       font-size: 0.9rem;
     }
+    /* テーブルレイアウト */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 0.9rem;
+    }
+    th, td {
+      border: 1px solid #e5e7eb;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f9fafb;
+    }
     .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
   <header>
-    <h1 id="app-title">Duexpo イベントマッチング</h1>
+    <h1 id="app-title">Duexpo マッチングシステム</h1>
     <button id="view-toggle-btn" class="nav-btn" onclick="toggleView()">運営画面へ切替</button>
   </header>
 
@@ -140,7 +162,7 @@
 
         <p><small>※原則同じレベル同士、難しい場合は隣接レベル（1と2、または2と3）で自動補填されます。</small></p>
 
-        <!-- 仕様3: 操作ボタン群 -->
+        <!-- ボタン群 -->
         <hr>
         <button id="btn-request" class="btn btn-primary" onclick="handleAction('REQUEST_MATCH')">次のマッチング依頼</button>
         <button id="btn-complete" class="btn btn-success" onclick="handleAction('COMPLETE_MATCH')">対戦完了</button>
@@ -156,10 +178,49 @@
 
     <!-- 3. 運営用画面（管理） -->
     <div id="admin-view" class="hidden">
-      <div class="card" style="border: 2px solid var(--primary);">
-        <h2>【運営管理パネル】</h2>
-        
-        <h3>受付時間・進行設定</h3>
+      
+      <!-- 参加者手動追加パネル -->
+      <div class="card" style="border: 2px solid var(--secondary);">
+        <h3>新規参加者の手動登録</h3>
+        <form onsubmit="addParticipantHand(event)">
+          <label>参加者名（ニックネーム等）:</label>
+          <input type="text" id="add-name" placeholder="例: タナカ" required>
+
+          <label>希望デュエパレベル:</label>
+          <select id="add-level">
+            <option value="1">レベル 1（カジュアル）</option>
+            <option value="2" selected>レベル 2（ミドル）</option>
+            <option value="3">レベル 3（ガチ）</option>
+          </select>
+
+          <button type="submit" class="btn btn-success">参加者を追加登録</button>
+        </form>
+      </div>
+
+      <!-- 参加者一覧テーブル -->
+      <div class="card">
+        <h3>登録参加者一覧 (<span id="total-participant-count">0</span>名)</h3>
+        <div style="overflow-x: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>名前</th>
+                <th>レベル</th>
+                <th>ステータス</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="participant-table-body">
+              <!-- JSで動的描画 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- イベント進行設定 -->
+      <div class="card">
+        <h3>進行・時間設定</h3>
         <label>イベント開催日 (YYYY-MM-DD):</label>
         <input type="date" id="admin-event-date" onchange="updateConfig()">
 
@@ -171,52 +232,51 @@
           現在マッチング受付中にする
         </label>
 
-        <label style="margin-top: 10px; display: block;">全体アナウンス:</label>
+        <label style="margin-top: 8px; display: block;">全体アナウンス:</label>
         <input type="text" id="admin-notice" placeholder="全体告知メッセージを入力" onchange="updateConfig()">
       </div>
 
+      <!-- マッチング実行 -->
       <div class="card">
         <h3>手動マッチング実行</h3>
-        <button class="btn btn-primary" onclick="runMatching()">マッチングを実行して卓を作成</button>
+        <button class="btn btn-primary" onclick="runMatching()">待機中の参加者で卓を作成</button>
       </div>
 
+      <!-- 作成されたテーブル一覧 -->
       <div class="card">
         <h3>作成されたテーブル一覧</h3>
         <div id="tables-container">
           <p style="color: #6b7280;">現在確定したテーブルはありません。</p>
         </div>
       </div>
+
     </div>
 
   </div>
 
   <script>
-    // ==========================================
-    // 運営設定データ（初期設定）
-    // ==========================================
+    // 運営設定データ
     let config = {
-      eventDate: new Date().toISOString().split('T')[0], // 初期値は当日
+      eventDate: new Date().toISOString().split('T')[0],
       isMatchingOpen: true,
       matchingEndTime: "17:00",
       announcementNotice: "本日の最終マッチング受付は17:00までとなります。"
     };
 
-    // サンプル参加者データ（待機キュー）
+    // 初期参加者データ
     let participants = [
-      { id: '1', name: '参加者A', duepaLevel: 1, status: 'IDLE' },
-      { id: '2', name: '参加者B', duepaLevel: 1, status: 'IDLE' },
-      { id: '3', name: '参加者C', duepaLevel: 2, status: 'IDLE' },
-      { id: '4', name: '参加者D', duepaLevel: 2, status: 'IDLE' },
-      { id: '5', name: '参加者E', duepaLevel: 2, status: 'IDLE' },
-      { id: '6', name: '参加者F', duepaLevel: 3, status: 'IDLE' },
-      { id: '7', name: '参加者G', duepaLevel: 3, status: 'IDLE' },
-      { id: '8', name: '参加者H', duepaLevel: 3, status: 'IDLE' }
+      { id: 'P-1', name: '参加者A', duepaLevel: 1, status: 'IDLE' },
+      { id: 'P-2', name: '参加者B', duepaLevel: 1, status: 'IDLE' },
+      { id: 'P-3', name: '参加者C', duepaLevel: 2, status: 'IDLE' },
+      { id: 'P-4', name: '参加者D', duepaLevel: 2, status: 'IDLE' },
+      { id: 'P-5', name: '参加者E', duepaLevel: 2, status: 'IDLE' },
+      { id: 'P-6', name: '参加者F', duepaLevel: 3, status: 'IDLE' },
+      { id: 'P-7', name: '参加者G', duepaLevel: 3, status: 'IDLE' },
+      { id: 'P-8', name: '参加者H', duepaLevel: 3, status: 'IDLE' }
     ];
 
-    // 自分の操作用仮データ
-    let currentUserId = '1';
+    let currentUserId = 'P-1';
 
-    // 初期化ロード
     window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('admin-event-date').value = config.eventDate;
       document.getElementById('admin-end-time').value = config.matchingEndTime;
@@ -226,9 +286,7 @@
       renderUI();
     });
 
-    // ==========================================
-    // 仕様1: 日付判定ロジック (当日のみ利用可能)
-    // ==========================================
+    // 1. 日付判定
     function checkDateValidation() {
       const now = new Date();
       const todayJST = new Intl.DateTimeFormat('ja-JP', {
@@ -238,9 +296,7 @@
         day: '2-digit'
       }).format(now).replace(/\//g, '-');
 
-      const isToday = (todayJST === config.eventDate);
-
-      if (!isToday) {
+      if (todayJST !== config.eventDate) {
         document.getElementById('expired-view').classList.remove('hidden');
         document.getElementById('participant-view').classList.add('hidden');
         document.getElementById('admin-view').classList.add('hidden');
@@ -250,9 +306,7 @@
       }
     }
 
-    // ==========================================
-    // 仕様2: 受付判定 & UI更新
-    // ==========================================
+    // 2. マッチング可能判定
     function isMatchingAvailable() {
       if (!config.isMatchingOpen) return false;
       const now = new Date();
@@ -266,25 +320,22 @@
       return currentJSTTime <= config.matchingEndTime;
     }
 
-    // UIの描画更新
+    // 3. UI全体の描画
     function renderUI() {
-      // 告知表示
-      const noticeBox = document.getElementById('notice-box');
+      // 告知更新
       const timeAvailable = isMatchingAvailable();
-      
-      noticeBox.innerHTML = `<strong>【お知らせ】</strong> ${config.announcementNotice}<br>受付指定時間：〜${config.matchingEndTime}まで (${timeAvailable ? '受付中' : '<span style="color:red">受付終了</span>'})`;
+      document.getElementById('notice-box').innerHTML = 
+        `<strong>【お知らせ】</strong> ${config.announcementNotice}<br>受付指定時間：〜${config.matchingEndTime}まで (${timeAvailable ? '受付中' : '<span style="color:red">受付終了</span>'})`;
 
-      // 依頼ボタンの有効/無効化
       document.getElementById('btn-request').disabled = !timeAvailable;
 
-      // 自分の状態反映
+      // 自分のステータス描画
       const user = participants.find(p => p.id === currentUserId);
       if (user) {
         const badge = document.getElementById('user-status-badge');
         badge.textContent = user.status === 'IDLE' ? '待機中' : (user.status === 'MATCHED' ? '対戦中' : '休憩中');
         badge.className = `badge badge-${user.status.toLowerCase()}`;
 
-        // ボタンの切り替え
         if (user.status === 'BREAK') {
           document.getElementById('btn-request').classList.add('hidden');
           document.getElementById('btn-complete').classList.add('hidden');
@@ -298,16 +349,66 @@
         }
       }
 
-      // レベルごとの待機人数集計
+      // レベルごとの待機人数
       const idles = participants.filter(p => p.status === 'IDLE');
       document.getElementById('count-lv1').textContent = idles.filter(p => Number(p.duepaLevel) === 1).length;
       document.getElementById('count-lv2').textContent = idles.filter(p => Number(p.duepaLevel) === 2).length;
       document.getElementById('count-lv3').textContent = idles.filter(p => Number(p.duepaLevel) === 3).length;
+
+      // 運営：参加者一覧テーブルの更新
+      renderParticipantTable();
     }
 
-    // ==========================================
-    // 仕様3: 参加者ボタンのステータス操作
-    // ==========================================
+    // 運営用：参加者一覧テーブル描画
+    function renderParticipantTable() {
+      const tbody = document.getElementById('participant-table-body');
+      document.getElementById('total-participant-count').textContent = participants.length;
+
+      if (participants.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">参加者が登録されていません</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = participants.map(p => `
+        <tr>
+          <td>${p.id}</td>
+          <td><strong>${p.name}</strong></td>
+          <td>Lv.${p.duepaLevel}</td>
+          <td><span class="badge badge-${p.status.toLowerCase()}">${p.status === 'IDLE' ? '待機' : (p.status === 'MATCHED' ? '対戦中' : '休憩')}</span></td>
+          <td>
+            <button class="btn btn-danger btn-sm" onclick="deleteParticipant('${p.id}')">削除</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // 運営用：手動登録機能
+    function addParticipantHand(event) {
+      event.preventDefault();
+      const nameInput = document.getElementById('add-name');
+      const levelInput = document.getElementById('add-level');
+
+      const newParticipant = {
+        id: `P-${participants.length + 1}`,
+        name: nameInput.value.trim(),
+        duepaLevel: Number(levelInput.value),
+        status: 'IDLE'
+      };
+
+      participants.push(newParticipant);
+      nameInput.value = ''; // 入力欄をクリア
+      renderUI();
+    }
+
+    // 運営用：手動削除機能
+    function deleteParticipant(id) {
+      if (confirm(`ID: ${id} の参加者を削除しますか？`)) {
+        participants = participants.filter(p => p.id !== id);
+        renderUI();
+      }
+    }
+
+    // 参加者アクション
     function handleAction(action) {
       const user = participants.find(p => p.id === currentUserId);
       if (!user) return;
@@ -333,9 +434,7 @@
       }
     }
 
-    // ==========================================
-    // 仕様4: デュエパレベル マッチング処理
-    // ==========================================
+    // マッチング実行
     function runMatching() {
       const waitingQueue = participants.filter(p => p.status === 'IDLE');
       const lv1 = waitingQueue.filter(p => Number(p.duepaLevel) === 1);
@@ -346,7 +445,7 @@
       let tableCount = 1;
 
       const createTable = (players) => {
-        players.forEach(p => p.status = 'MATCHED'); // 対戦中に変更
+        players.forEach(p => p.status = 'MATCHED');
         tables.push({ id: tableCount++, players });
       };
 
@@ -364,7 +463,6 @@
       const pool23 = [...remLv2, ...lv3];
       while (pool23.length >= 4) createTable(pool23.splice(0, 4));
 
-      // 結果描画
       const container = document.getElementById('tables-container');
       if (tables.length === 0) {
         container.innerHTML = '<p style="color: #6b7280;">条件に合う卓を作成できませんでした（人数不足など）。</p>';
@@ -380,7 +478,7 @@
       renderUI();
     }
 
-    // 画面切り替え（参加者 ⇔ 運営）
+    // 画面切り替え
     function toggleView() {
       const pView = document.getElementById('participant-view');
       const aView = document.getElementById('admin-view');
@@ -397,7 +495,7 @@
       }
     }
 
-    // 運営による設定変更
+    // 設定更新
     function updateConfig() {
       config.eventDate = document.getElementById('admin-event-date').value;
       config.matchingEndTime = document.getElementById('admin-end-time').value;
