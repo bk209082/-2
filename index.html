@@ -1,3 +1,4 @@
+HTML
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -63,6 +64,7 @@
     .badge-idle { background-color: var(--secondary); }
     .badge-matched { background-color: var(--success); }
     .badge-break { background-color: #6b7280; }
+    .badge-none { background-color: #9ca3af; }
     .btn {
       width: 100%;
       padding: 10px;
@@ -146,27 +148,41 @@
 
     <!-- 2. 参加者用画面 -->
     <div id="participant-view">
+      
+      <!-- 参加者名前登録カード -->
+      <div class="card" style="border: 2px solid var(--secondary);">
+        <h3>参加者プロフィールの設定</h3>
+        <form onsubmit="registerSelfName(event)">
+          <label>あなたの名前（ニックネーム）:</label>
+          <input type="text" id="self-name-input" placeholder="例: タナカ" required>
+          
+          <label for="duepa-level">希望デュエパレベル (1〜3):</label>
+          <select id="duepa-level">
+            <option value="1">レベル 1（カジュアル・エンタメ）</option>
+            <option value="2" selected>レベル 2（ミドル・標準）</option>
+            <option value="3">レベル 3（ガチ・ガチまとめ）</option>
+          </select>
+
+          <button type="submit" class="btn btn-success" id="btn-save-profile">プロフィールを保存して参加</button>
+        </form>
+      </div>
+
       <div class="card">
         <h2>参加者マイページ</h2>
         <div id="notice-box" class="notice"></div>
 
-        <p>状態: <span id="user-status-badge" class="badge badge-idle">待機中</span></p>
-
-        <label for="duepa-level">希望デュエパレベル (1〜3):</label>
-        <select id="duepa-level" onchange="changeLevel(this.value)">
-          <option value="1">レベル 1（カジュアル・エンタメ）</option>
-          <option value="2" selected>レベル 2（ミドル・標準）</option>
-          <option value="3">レベル 3（ガチ・ガチまとめ）</option>
-        </select>
+        <p>登録名: <strong><span id="user-name-display" style="color: var(--secondary);">未登録</span></strong></p>
+        <p>状態: <span id="user-status-badge" class="badge badge-none">未登録</span></p>
 
         <p><small>※原則同じレベル同士、難しい場合は隣接レベル（1と2、または2と3）で自動補填されます。</small></p>
 
-        <!-- ボタン群 -->
+        <!-- ボタン群（名前登録完了まで無効化） -->
         <hr>
-        <button id="btn-request" class="btn btn-primary" onclick="handleAction('REQUEST_MATCH')">次のマッチング依頼</button>
-        <button id="btn-complete" class="btn btn-success" onclick="handleAction('COMPLETE_MATCH')">対戦完了</button>
-        <button id="btn-break" class="btn btn-warning" onclick="handleAction('TAKE_BREAK')">休憩する</button>
-        <button id="btn-resume" class="btn btn-secondary hidden" onclick="handleAction('RESUME_MATCH')">休憩終了・マッチング開始</button>
+        <p id="register-warning" style="color: var(--danger); font-size: 0.85rem;">※名前を登録すると対戦操作が可能になります。</p>
+        <button id="btn-request" class="btn btn-primary" onclick="handleAction('REQUEST_MATCH')" disabled>次のマッチング依頼</button>
+        <button id="btn-complete" class="btn btn-success" onclick="handleAction('COMPLETE_MATCH')" disabled>対戦完了</button>
+        <button id="btn-break" class="btn btn-warning" onclick="handleAction('TAKE_BREAK')" disabled>休憩する</button>
+        <button id="btn-resume" class="btn btn-secondary hidden" onclick="handleAction('RESUME_MATCH')" disabled>休憩終了・マッチング開始</button>
       </div>
 
       <div class="card">
@@ -180,7 +196,7 @@
       
       <!-- 参加者手動追加パネル -->
       <div class="card" style="border: 2px solid var(--secondary);">
-        <h3>新規参加者の手動登録</h3>
+        <h3>新規参加者の手動登録（運営代理用）</h3>
         <form onsubmit="addParticipantHand(event)">
           <label>参加者名（ニックネーム等）:</label>
           <input type="text" id="add-name" placeholder="例: タナカ" required>
@@ -254,9 +270,9 @@
   </div>
 
   <script>
-    // 運営管理用パスワード設定（ここを変更するとパスワードが変わります）
+    // 運営管理用パスワード設定
     const ADMIN_PASSWORD = "duexpo2026";
-    let isAdminAuthenticated = false; // 運営ログイン状態
+    let isAdminAuthenticated = false;
 
     // 運営設定データ
     let config = {
@@ -266,19 +282,9 @@
       announcementNotice: "本日の最終マッチング受付は17:00までとなります。"
     };
 
-    // 初期参加者データ
-    let participants = [
-      { id: 'P-1', name: '参加者A', duepaLevel: 1, status: 'IDLE' },
-      { id: 'P-2', name: '参加者B', duepaLevel: 1, status: 'IDLE' },
-      { id: 'P-3', name: '参加者C', duepaLevel: 2, status: 'IDLE' },
-      { id: 'P-4', name: '参加者D', duepaLevel: 2, status: 'IDLE' },
-      { id: 'P-5', name: '参加者E', duepaLevel: 2, status: 'IDLE' },
-      { id: 'P-6', name: '参加者F', duepaLevel: 3, status: 'IDLE' },
-      { id: 'P-7', name: '参加者G', duepaLevel: 3, status: 'IDLE' },
-      { id: 'P-8', name: '参加者H', duepaLevel: 3, status: 'IDLE' }
-    ];
-
-    let currentUserId = 'P-1';
+    // 参加者リストデータ
+    let participants = [];
+    let currentUserId = null; // 登録された自身のID
 
     window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('admin-event-date').value = config.eventDate;
@@ -309,7 +315,38 @@
       }
     }
 
-    // 2. マッチング可能判定
+    // 2. 自分の名前・レベルの保存処理
+    function registerSelfName(event) {
+      event.preventDefault();
+      const nameInput = document.getElementById('self-name-input').value.trim();
+      const levelInput = Number(document.getElementById('duepa-level').value);
+
+      if (!nameInput) return;
+
+      if (!currentUserId) {
+        // 新規作成
+        currentUserId = `P-${participants.length + 1}`;
+        const newParticipant = {
+          id: currentUserId,
+          name: nameInput,
+          duepaLevel: levelInput,
+          status: 'IDLE'
+        };
+        participants.push(newParticipant);
+      } else {
+        // 更新
+        const user = participants.find(p => p.id === currentUserId);
+        if (user) {
+          user.name = nameInput;
+          user.duepaLevel = levelInput;
+        }
+      }
+
+      alert("プロフィールを登録しました。対戦操作が可能です。");
+      renderUI();
+    }
+
+    // 3. マッチング受付可能判定
     function isMatchingAvailable() {
       if (!config.isMatchingOpen) return false;
       const now = new Date();
@@ -323,19 +360,28 @@
       return currentJSTTime <= config.matchingEndTime;
     }
 
-    // 3. UI描画
+    // 4. UI描画処理
     function renderUI() {
       const timeAvailable = isMatchingAvailable();
       document.getElementById('notice-box').innerHTML = 
         `<strong>【お知らせ】</strong> ${config.announcementNotice}<br>受付指定時間：〜${config.matchingEndTime}まで (${timeAvailable ? '受付中' : '<span style="color:red">受付終了</span>'})`;
 
-      document.getElementById('btn-request').disabled = !timeAvailable;
-
       const user = participants.find(p => p.id === currentUserId);
+
+      // ユーザー登録状態に応じたUI操作制御
       if (user) {
+        document.getElementById('user-name-display').textContent = user.name;
+        document.getElementById('register-warning').classList.add('hidden');
+
         const badge = document.getElementById('user-status-badge');
         badge.textContent = user.status === 'IDLE' ? '待機中' : (user.status === 'MATCHED' ? '対戦中' : '休憩中');
         badge.className = `badge badge-${user.status.toLowerCase()}`;
+
+        // ボタンの活性化
+        document.getElementById('btn-request').disabled = !timeAvailable;
+        document.getElementById('btn-complete').disabled = false;
+        document.getElementById('btn-break').disabled = false;
+        document.getElementById('btn-resume').disabled = false;
 
         if (user.status === 'BREAK') {
           document.getElementById('btn-request').classList.add('hidden');
@@ -348,8 +394,23 @@
           document.getElementById('btn-break').classList.remove('hidden');
           document.getElementById('btn-resume').classList.add('hidden');
         }
+      } else {
+        // 未登録の場合
+        document.getElementById('user-name-display').textContent = '未登録';
+        document.getElementById('register-warning').classList.remove('hidden');
+
+        const badge = document.getElementById('user-status-badge');
+        badge.textContent = '未登録';
+        badge.className = 'badge badge-none';
+
+        // 操作ボタンを無効化
+        document.getElementById('btn-request').disabled = true;
+        document.getElementById('btn-complete').disabled = true;
+        document.getElementById('btn-break').disabled = true;
+        document.getElementById('btn-resume').disabled = true;
       }
 
+      // レベル別人数の表示
       const idles = participants.filter(p => p.status === 'IDLE');
       document.getElementById('count-lv1').textContent = idles.filter(p => Number(p.duepaLevel) === 1).length;
       document.getElementById('count-lv2').textContent = idles.filter(p => Number(p.duepaLevel) === 2).length;
@@ -358,6 +419,7 @@
       renderParticipantTable();
     }
 
+    // 運営一覧テーブル
     function renderParticipantTable() {
       const tbody = document.getElementById('participant-table-body');
       document.getElementById('total-participant-count').textContent = participants.length;
@@ -380,6 +442,7 @@
       `).join('');
     }
 
+    // 運営用手動登録
     function addParticipantHand(event) {
       event.preventDefault();
       const nameInput = document.getElementById('add-name');
@@ -400,11 +463,14 @@
     function deleteParticipant(id) {
       if (confirm(`ID: ${id} の参加者を削除しますか？`)) {
         participants = participants.filter(p => p.id !== id);
+        if (currentUserId === id) currentUserId = null;
         renderUI();
       }
     }
 
+    // ボタンアクション
     function handleAction(action) {
+      if (!currentUserId) return;
       const user = participants.find(p => p.id === currentUserId);
       if (!user) return;
 
@@ -421,14 +487,7 @@
       renderUI();
     }
 
-    function changeLevel(level) {
-      const user = participants.find(p => p.id === currentUserId);
-      if (user) {
-        user.duepaLevel = Number(level);
-        renderUI();
-      }
-    }
-
+    // マッチング実行
     function runMatching() {
       const waitingQueue = participants.filter(p => p.status === 'IDLE');
       const lv1 = waitingQueue.filter(p => Number(p.duepaLevel) === 1);
@@ -469,16 +528,13 @@
       renderUI();
     }
 
-    // ==========================================
-    // 運営画面切替・パスワード認証制御
-    // ==========================================
+    // 運営画面切替認証
     function toggleView() {
       const pView = document.getElementById('participant-view');
       const aView = document.getElementById('admin-view');
       const btn = document.getElementById('view-toggle-btn');
 
       if (aView.classList.contains('hidden')) {
-        // 未認証の場合はパスワードの入力を求める
         if (!isAdminAuthenticated) {
           const inputPassword = prompt("運営用パスワードを入力してください:");
           if (inputPassword === ADMIN_PASSWORD) {
