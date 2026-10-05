@@ -111,7 +111,6 @@
       margin-bottom: 12px;
       font-size: 0.9rem;
     }
-    /* テーブルレイアウト */
     table {
       width: 100%;
       border-collapse: collapse;
@@ -255,6 +254,10 @@
   </div>
 
   <script>
+    // 運営管理用パスワード設定（ここを変更するとパスワードが変わります）
+    const ADMIN_PASSWORD = "duexpo2026";
+    let isAdminAuthenticated = false; // 運営ログイン状態
+
     // 運営設定データ
     let config = {
       eventDate: new Date().toISOString().split('T')[0],
@@ -320,16 +323,14 @@
       return currentJSTTime <= config.matchingEndTime;
     }
 
-    // 3. UI全体の描画
+    // 3. UI描画
     function renderUI() {
-      // 告知更新
       const timeAvailable = isMatchingAvailable();
       document.getElementById('notice-box').innerHTML = 
         `<strong>【お知らせ】</strong> ${config.announcementNotice}<br>受付指定時間：〜${config.matchingEndTime}まで (${timeAvailable ? '受付中' : '<span style="color:red">受付終了</span>'})`;
 
       document.getElementById('btn-request').disabled = !timeAvailable;
 
-      // 自分のステータス描画
       const user = participants.find(p => p.id === currentUserId);
       if (user) {
         const badge = document.getElementById('user-status-badge');
@@ -349,17 +350,14 @@
         }
       }
 
-      // レベルごとの待機人数
       const idles = participants.filter(p => p.status === 'IDLE');
       document.getElementById('count-lv1').textContent = idles.filter(p => Number(p.duepaLevel) === 1).length;
       document.getElementById('count-lv2').textContent = idles.filter(p => Number(p.duepaLevel) === 2).length;
       document.getElementById('count-lv3').textContent = idles.filter(p => Number(p.duepaLevel) === 3).length;
 
-      // 運営：参加者一覧テーブルの更新
       renderParticipantTable();
     }
 
-    // 運営用：参加者一覧テーブル描画
     function renderParticipantTable() {
       const tbody = document.getElementById('participant-table-body');
       document.getElementById('total-participant-count').textContent = participants.length;
@@ -382,7 +380,6 @@
       `).join('');
     }
 
-    // 運営用：手動登録機能
     function addParticipantHand(event) {
       event.preventDefault();
       const nameInput = document.getElementById('add-name');
@@ -396,11 +393,10 @@
       };
 
       participants.push(newParticipant);
-      nameInput.value = ''; // 入力欄をクリア
+      nameInput.value = '';
       renderUI();
     }
 
-    // 運営用：手動削除機能
     function deleteParticipant(id) {
       if (confirm(`ID: ${id} の参加者を削除しますか？`)) {
         participants = participants.filter(p => p.id !== id);
@@ -408,7 +404,6 @@
       }
     }
 
-    // 参加者アクション
     function handleAction(action) {
       const user = participants.find(p => p.id === currentUserId);
       if (!user) return;
@@ -434,7 +429,6 @@
       }
     }
 
-    // マッチング実行
     function runMatching() {
       const waitingQueue = participants.filter(p => p.status === 'IDLE');
       const lv1 = waitingQueue.filter(p => Number(p.duepaLevel) === 1);
@@ -449,16 +443,13 @@
         tables.push({ id: tableCount++, players });
       };
 
-      // 1. 同一レベル4人卓
       [lv1, lv2, lv3].forEach(pool => {
         while (pool.length >= 4) createTable(pool.splice(0, 4));
       });
 
-      // 2. レベル 1 & 2 混合卓
       const pool12 = [...lv1, ...lv2];
       while (pool12.length >= 4) createTable(pool12.splice(0, 4));
 
-      // 3. レベル 2 & 3 混合卓
       const remLv2 = pool12.filter(p => Number(p.duepaLevel) === 2);
       const pool23 = [...remLv2, ...lv3];
       while (pool23.length >= 4) createTable(pool23.splice(0, 4));
@@ -478,13 +469,26 @@
       renderUI();
     }
 
-    // 画面切り替え
+    // ==========================================
+    // 運営画面切替・パスワード認証制御
+    // ==========================================
     function toggleView() {
       const pView = document.getElementById('participant-view');
       const aView = document.getElementById('admin-view');
       const btn = document.getElementById('view-toggle-btn');
 
       if (aView.classList.contains('hidden')) {
+        // 未認証の場合はパスワードの入力を求める
+        if (!isAdminAuthenticated) {
+          const inputPassword = prompt("運営用パスワードを入力してください:");
+          if (inputPassword === ADMIN_PASSWORD) {
+            isAdminAuthenticated = true;
+            alert("認証に成功しました。");
+          } else {
+            alert("パスワードが正しくありません。");
+            return;
+          }
+        }
         pView.classList.add('hidden');
         aView.classList.remove('hidden');
         btn.textContent = '参加者画面へ切替';
@@ -495,7 +499,6 @@
       }
     }
 
-    // 設定更新
     function updateConfig() {
       config.eventDate = document.getElementById('admin-event-date').value;
       config.matchingEndTime = document.getElementById('admin-end-time').value;
